@@ -6,11 +6,11 @@ from datetime import datetime
 # إعداد واجهة النظام السحابي
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
-# الاتصال بقاعدة بيانات نظيفة ومستقرة تماماً
-conn = sqlite3.connect('gomla_perfect_v7_system.db', check_same_thread=False)
+# الاتصال بقاعدة بيانات جديدة ونظيفة تماماً لمنع أي تعارض مع الملفات القديمة
+conn = sqlite3.connect('gomla_perfect_v9_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
-# إنشاء وتحديث الجداول المحاسبية المتطورة
+# إنشاء الجداول المحاسبية المتطورة
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS products 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, today_price REAL, stock INTEGER, user_email TEXT)''')
@@ -88,14 +88,13 @@ else:
             
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
-    # التبويبات المحاسبية المتطورة
     tab1, tab2, tab3, tab4 = st.tabs(["📦 إدارة السلع والمخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير الذكي", "📅 المرجعيات والأرشيف التاريخي"])
 
     # --- التبويب الأول: إدارة المخزن والأسعار الحالية ---
     with tab1:
         st.subheader("🏬 مستودع البضائع والأسعار الحالية")
         
-        with st.expander("➕ إضافة سلعة جديدة للمخزن"):
+        with ft = st.expander("➕ إضافة سلعة جديدة للمخزن"):
             p_name = st.text_input("اسم السلعة الجديد")
             p_today = st.number_input("سعر البيع الحالي (ج.م)", value=None, placeholder="اكتب سعر البيع...")
             p_stock = st.number_input("الكمية المتاحة حالياً بالمخزن", value=None, placeholder="اكتب كمية المخزن الأولية...", step=1)
@@ -132,7 +131,7 @@ else:
                     st.rerun()
 
             with st.expander("🗑️ قسم حذف السلع"):
-                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values)
+                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values[0])
                 if st.button("تأكيد الحذف"):
                     cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (del_id, user_email))
                     conn.commit()
@@ -140,7 +139,7 @@ else:
         else:
             st.info("المخزن فارغ تماماً.")
 
-    # --- 👥 التبويب الثاني: سجل الموردين والعملاء ---
+    # --- التبويب الثاني: سجل الموردين والعملاء ---
     with tab2:
         st.subheader("🏭 سجل الموردين (الدائنين)")
         with st.expander("➕ إضافة مورد جديد للدفتر"):
@@ -175,5 +174,5 @@ else:
             cust_df.columns = ['كود العميل', 'اسم العميل', 'المديونية المستحقة عليه ج.م']
         st.dataframe(cust_df, use_container_width=True, hide_index=True)
 
-    # --- 🧾 التبويب الثالث: تسجيل الفواتير الذكي ---
+    # --- التبويب الثالث: تسجيل الفواتير الذكي ---
     with tab3:
