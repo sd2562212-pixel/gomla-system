@@ -97,16 +97,16 @@ else:
         products_df = pd.read_sql_query("SELECT * FROM products WHERE user_email = ?", conn, params=(user_email,))
         
         if products_df.empty:
-            st.info("💡 المخزن فارغ. أضف بعض المنتجات من تبويب 'إدارة المخزن' لتتحكم في أسعار اليوم هنا.")
+            st.info("💡 المخزن فارغ. أضف بعض المنتجات من تبويب 'إدارة المخزن' لتتحكم in أسعار اليوم هنا.")
         else:
             for index, row in products_df.iterrows():
                 st.markdown(f"📦 **{row['name']}**")
-                c_info, c_input = st.columns()
+                # تم تصحيح السطر المسبب للمشكلة هنا بتحديد رقم 2 لتقسيم الشاشة بدقة
+                c_info, c_input = st.columns(2)
                 with c_info:
                     st.write(f"(تكلفة الشراء: {row['purchase_price']} ج.م | المخزن الحالي: {row['stock']})")
                 with c_input:
-                    # تعديل: الخانة تقبل الإدخال فارغاً بدون أصفار افتراضية عبر إضافة value=None
-                    new_price = st.number_input(f"سعر البيع لليوم", value=None, placeholder="اكتب السعر هنا وضغط Enter...", key=f"sale_p_{row['id']}")
+                    new_price = st.number_input(f"سعر البيع لليوم", value=None, placeholder="اكتب السعر وضغط Enter...", key=f"sale_p_{row['id']}")
                     
                 if new_price is not None and new_price != row['today_price']:
                     cursor.execute("UPDATE products SET today_price = ? WHERE id = ? AND user_email = ?", (new_price, row['id'], user_email))
@@ -121,7 +121,6 @@ else:
         st.subheader("📦 إدارة أصل البضائع والمخزن")
         with st.expander("➕ إضافة بضاعة/سلعة جديدة للمخزن الأصلي"):
             p_name = st.text_input("اسم السلعة")
-            # تعديل: خانات فارغة تماماً بدون أصفار
             p_purchase = st.number_input("سعر التكلفة/الشراء (ج.م)", value=None, placeholder="اكتب سعر الشراء...")
             p_today = st.number_input("سعر البيع الابتدائي (ج.م)", value=None, placeholder="اكتب سعر البيع...")
             p_stock = st.number_input("الكمية المتاحة", value=None, placeholder="اكتب الكمية بالعد...", step=1)
@@ -139,10 +138,8 @@ else:
         st.subheader("📋 قائمة إكسيل المنظمة لجرد المخزن")
         prod_df = pd.read_sql_query("SELECT id as 'كود السلعة', name as 'اسم السلعة', purchase_price as 'سعر الشراء ج.م', today_price as 'سعر بيع اليوم ج.م', stock as 'الكمية المتاحة' FROM products WHERE user_email = ?", conn, params=(user_email,))
         if not prod_df.empty:
-            # عرض على شكل جدول إكسيل منظم واحترافي تماماً
             st.dataframe(prod_df, use_container_width=True, hide_index=True)
             
-            # قسم الحذف السريع لعدم تشويه مظهر الإكسيل
             with st.expander("🗑️ قسم حذف السلع من المخزن"):
                 del_id = st.selectbox("اختر السلعة المراد حذفها نهائياً", prod_df['كود السلعة'].tolist())
                 if st.button("تأكيد حذف السلعة المختارة"):
@@ -152,12 +149,12 @@ else:
         else:
             st.info("المخزن فارغ تماماً.")
 
-    # --- التبويب الثالث: سجل الموردين لوحدهم وسجل العملاء لوحدهم على شكل إكسيل ---
+    # --- التبويب الثالث: سجل الموردين والعملاء على شكل إكسيل ---
     with tab3:
         st.subheader("🏭 سجل الموردين (الدائنين)")
         with st.expander("➕ إضافة مورد جديد للدفتر"):
             s_name = st.text_input("اسم المورد الجديد")
-            s_bal = st.number_input("حساب المورد الابتدائي (ج.م)", value=None, placeholder="اكتب الحساب المالي الافتتاحي إن وجد...")
+            s_bal = st.number_input("حساب المورد الابتدائي (ج.م)", value=None, placeholder="اكتب الحساب المالي الافتتاحي...")
             if st.button("حفظ المورد"):
                 if s_name:
                     final_bal = s_bal if s_bal is not None else 0.0
@@ -171,3 +168,7 @@ else:
         st.subheader("👥 سجل العملاء (المدينين)")
         with st.expander("➕ إضافة عميل جديد للدفتر"):
             c_name = st.text_input("اسم العميل الجديد")
+            c_bal = st.number_input("حساب العميل المديونية الابتدائية (ج.م)", value=None, placeholder="اكتب مديونية العميل...")
+            if st.button("حفظ العميل"):
+                if c_name:
+                    final_c_bal = c_bal if c_bal is not None else 0.0
