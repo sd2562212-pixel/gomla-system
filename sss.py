@@ -1,3 +1,4 @@
+
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -24,8 +25,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# الاتصال بقاعدة البيانات السحابية (إصدار نهائي ومستقر ومفرز)
-conn = sqlite3.connect('gomla_modern_final_system.db', check_same_thread=False)
+# الحل الجذري: الاتصال بقاعدة بيانات جديدة كلياً لتفادي تضارب القوائم والجداول القديمة
+conn = sqlite3.connect('gomla_perfect_v12_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الهيكل المحاسبي الشامل والمتطور للمحل
