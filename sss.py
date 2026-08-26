@@ -6,8 +6,8 @@ from datetime import datetime
 # إعداد واجهة النظام السحابي
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
-# الحل: تم تغيير اسم قاعدة البيانات هنا لتوليد جداول نظيفة ومتوافقة تماماً ومنع الخطأ
-conn = sqlite3.connect('gomla_final_stable_system.db', check_same_thread=False)
+# الحل: تم تغيير اسم قاعدة البيانات لفرض بناء جداول جديدة متوافقة مع الكود
+conn = sqlite3.connect('gomla_clean_final_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الجداول المحاسبية المتطورة
@@ -114,9 +114,12 @@ else:
         st.markdown("---")
         st.subheader("📋 قائمة جرد المخزن وتحديث الأسعار المستمرة")
         
-        prod_data = pd.read_sql_query("SELECT id, name as 'اسم السلعة', today_price as 'سعر البيع ج.م', stock as 'الكمية الحالية' FROM products WHERE user_email = ?", conn)
+        # استخدام استعلام مباشر متوافق لتفادي الأخطاء البرمجية
+        prod_data = pd.read_sql_query("SELECT id, name, today_price, stock FROM products WHERE user_email = ?", conn)
         
         if not prod_data.empty:
+            # تعديل المسميات الخارجية فقط للعرض بشكل منظم كالإكسيل
+            prod_data.columns = ['id', 'اسم السلعة', 'سعر البيع ج.م', 'الكمية الحالية']
             edited_df = st.data_editor(prod_data, hide_index=True, use_container_width=True, disabled=["id", "اسم السلعة"])
             
             for idx, row in edited_df.iterrows():
@@ -151,7 +154,9 @@ else:
                     cursor.execute("INSERT INTO suppliers (name, balance, user_email) VALUES (?, ?, ?)", (s_name, final_bal, user_email))
                     conn.commit()
                     st.rerun()
-        supp_df = pd.read_sql_query("SELECT id as 'كود المورد', name as 'اسم المورد', balance as 'الحساب المستحق له ج.م' FROM suppliers WHERE user_email = ?", conn)
+        supp_df = pd.read_sql_query("SELECT id, name, balance FROM suppliers WHERE user_email = ?", conn)
+        if not supp_df.empty:
+            supp_df.columns = ['كود المورد', 'اسم المورد', 'الحساب المستحق له ج.م']
         st.dataframe(supp_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
@@ -165,9 +170,6 @@ else:
                     cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, final_c_bal, user_email))
                     conn.commit()
                     st.rerun()
-        cust_df = pd.read_sql_query("SELECT id as 'كود العميل', name as 'اسم العميل', balance as 'المديونية المستحقة عليه ج.م' FROM customers WHERE user_email = ?", conn)
-        st.dataframe(cust_df, use_container_width=True, hide_index=True)
-
-    # --- 🧾 التبويب الثالث: تسجيل الفواتير الذكي ---
-    with tab3:
-        st.subheader("🧾 إنشاء وتسجيل فاتورة حركية ذكية")
+        cust_df = pd.read_sql_query("SELECT id, name, balance FROM customers WHERE user_email = ?", conn)
+        if not cust_df.empty:
+            cust_df.columns = ['كود العميل', 'اسم العميل', 'المديونية المستحقة عليه ج.م']
