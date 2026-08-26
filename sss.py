@@ -6,8 +6,8 @@ from datetime import datetime
 # إعداد واجهة النظام السحابي
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
-# الاتصال بقاعدة بيانات جديدة ونظيفة لضمان استقرار العمل
-conn = sqlite3.connect('gomla_perfect_final_system.db', check_same_thread=False)
+# الاتصال بقاعدة بيانات نظيفة ومستقرة تماماً
+conn = sqlite3.connect('gomla_perfect_v7_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء وتحديث الجداول المحاسبية المتطورة
@@ -91,7 +91,7 @@ else:
     # التبويبات المحاسبية المتطورة
     tab1, tab2, tab3, tab4 = st.tabs(["📦 إدارة السلع والمخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير الذكي", "📅 المرجعيات والأرشيف التاريخي"])
 
-    # --- التبويب الأول: إدارة المخزن والأسعار الحالية وحفظ اللقطة اليومية ---
+    # --- التبويب الأول: إدارة المخزن والأسعار الحالية ---
     with tab1:
         st.subheader("🏬 مستودع البضائع والأسعار الحالية")
         
@@ -114,10 +114,7 @@ else:
         st.markdown("---")
         st.subheader("📋 قائمة جرد المخزن وتحديث الأسعار المستمرة")
         
-        try:
-            prod_data = pd.read_sql_query("SELECT id, name, today_price, stock FROM products WHERE user_email = ?", conn)
-        except:
-            prod_data = pd.DataFrame(columns=['id', 'name', 'today_price', 'stock'])
+        prod_data = pd.read_sql_query("SELECT id, name, today_price, stock FROM products WHERE user_email = ?", conn)
         
         if not prod_data.empty:
             prod_data.columns = ['id', 'اسم السلعة', 'سعر البيع ج.م', 'الكمية الحالية']
@@ -155,12 +152,10 @@ else:
                     cursor.execute("INSERT INTO suppliers (name, balance, user_email) VALUES (?, ?, ?)", (s_name, final_bal, user_email))
                     conn.commit()
                     st.rerun()
-        try:
-            supp_df = pd.read_sql_query("SELECT id, name, balance FROM suppliers WHERE user_email = ?", conn)
-            if not supp_df.empty:
-                supp_df.columns = ['كود المورد', 'اسم المورد', 'الحساب المستحق له ج.م']
-        except:
-            supp_df = pd.DataFrame()
+        
+        supp_df = pd.read_sql_query("SELECT id, name, balance FROM suppliers WHERE user_email = ?", conn)
+        if not supp_df.empty:
+            supp_df.columns = ['كود المورد', 'اسم المورد', 'الحساب المستحق له ج.م']
         st.dataframe(supp_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
@@ -174,6 +169,11 @@ else:
                     cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, final_c_bal, user_email))
                     conn.commit()
                     st.rerun()
-        try:
-            cust_df = pd.read_sql_query("SELECT id, name, balance FROM customers WHERE user_email = ?", conn)
-            if not cust_df.empty:
+        
+        cust_df = pd.read_sql_query("SELECT id, name, balance FROM customers WHERE user_email = ?", conn)
+        if not cust_df.empty:
+            cust_df.columns = ['كود العميل', 'اسم العميل', 'المديونية المستحقة عليه ج.م']
+        st.dataframe(cust_df, use_container_width=True, hide_index=True)
+
+    # --- 🧾 التبويب الثالث: تسجيل الفواتير الذكي ---
+    with tab3:
