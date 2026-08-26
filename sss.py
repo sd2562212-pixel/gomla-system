@@ -1,13 +1,13 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # إعداد واجهة النظام السحابي
-st.set_page_config(page_title="سيستم محل الجملة الذكي - إكسيل ستايل", layout="centered")
+st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
 # الاتصال بقاعدة البيانات السحابية المشتركة
-conn = sqlite3.connect('gomla_ultimate_excel_system.db', check_same_thread=False)
+conn = sqlite3.connect('gomla_ultimate_auto_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الجداول المحاسبية المتطورة
@@ -18,10 +18,11 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS suppliers
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS customers 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS price_history 
-    (product_name TEXT, old_price REAL, new_price REAL, date TEXT, user_email TEXT)''')
+# جدول متطور لحفظ لقطة يومية للأسعار (سجل المرجعيات التاريخي)
+cursor.execute('''CREATE TABLE IF NOT EXISTS daily_price_snapshot 
+    (product_name TEXT, price REAL, snapshot_date TEXT, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS invoices 
-    (id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_type TEXT, party_name TEXT, total_amount REAL, date TEXT, user_email TEXT)''')
+    (id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_type TEXT, party_name TEXT, product_name TEXT, quantity INTEGER, total_amount REAL, date TEXT, user_email TEXT)''')
 
 conn.commit()
 
@@ -52,7 +53,7 @@ if not st.session_state.logged_in:
                     except sqlite3.IntegrityError:
                         st.error("⚠️ هذا البريد الإلكتروني مسجل بالفعل بالنظام من قبل!")
                 else:
-                    st.error("❌ كلمات المرور غير متطابقة")
+                    st.error("❌ كلمات الور غير متطابقة")
             else:
                 st.error("برجاء ملء جميع الخانات")
 
@@ -88,90 +89,82 @@ else:
             
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
-    # التبويبات والمجلدات الحسابية المفصلة
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 أسعار البيع اليومية", "📦 إدارة المخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير", "📅 أرشيف السجلات والتاريخ"])
+    # التبويبات المحاسبية المتطورة الجديدة والمفصلة تماماً
+    tab1, tab2, tab3, tab4 = st.tabs(["📦 إدارة السلع والمخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير الذكي", "📅 المرجعيات والأرشيف التاريخي"])
 
-    # --- التبويب الأول: قائمة تعديل الأسعار اليومية فقط لليوم الحالي ---
+    # --- التبويب الأول: إدارة المخزن والأسعار الحالية وحفظ اللقطة اليومية ---
     with tab1:
-        st.subheader("🔄 تعديل أسعار البيع اليومية لحظياً")
-        products_df = pd.read_sql_query("SELECT * FROM products WHERE user_email = ?", conn, params=(user_email,))
+        st.subheader("🏬 مستودع البضائع والأسعار الحالية")
         
-        if products_df.empty:
-            st.info("💡 المخزن فارغ. أضف بعض المنتجات من تبويب 'إدارة المخزن' لتتحكم في أسعار اليوم هنا.")
-        else:
-            st.caption("💡 بعد كتابة السعر، اضغط على زر 'Go' أو 'تم' (Done) في كيبورد الآيفون لحفظ السعر وتعميمه فوراً.")
-            for index, row in products_df.iterrows():
-                st.markdown(f"📦 **{row['name']}**")
-                c_info, c_input = st.columns(2)
-                with c_info:
-                    st.write(f"(المخزن الحالي: {row['stock']})")
-                with c_input:
-                    new_price = st.number_input(f"سعر البيع لليوم", value=None, placeholder="اكتب السعر وضغط Go...", key=f"sale_p_{row['id']}")
-                    
-                if new_price is not None and new_price != row['today_price']:
-                    cursor.execute("UPDATE products SET today_price = ? WHERE id = ? AND user_email = ?", (new_price, row['id'], user_email))
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    cursor.execute("INSERT INTO price_history VALUES (?, ?, ?, ?, ?)", (row['name'], row['today_price'], new_price, current_time, user_email))
-                    conn.commit()
-                    st.toast(f"✅ تم تعميم سعر اليوم لـ {row['name']}!")
-                    st.rerun()
-
-    # --- التبويب الثاني: إدارة المخزن الأساسي وإضافة وحذف البضائع ---
-    with tab2:
-        st.subheader("📦 إدارة أصل البضائع والمخزن")
-        with st.expander("➕ إضافة بضاعة/سلعة جديدة للمخزن الأصلي"):
-            p_name = st.text_input("اسم السلعة")
-            # تم حذف خانة سعر الشراء تماماً من هنا
-            p_today = st.number_input("سعر البيع الابتدائي (ج.م)", value=None, placeholder="اكتب سعر البيع الافتتاحي...")
-            p_stock = st.number_input("الكمية المتاحة بالمخزن", value=None, placeholder="اكتب الكمية المتاحة حالياً...", step=1)
+        with st.expander("➕ إضافة سلعة جديدة للمخزن"):
+            p_name = st.text_input("اسم السلعة الجديد")
+            p_today = st.number_input("سعر البيع الحالي (ج.م)", value=None, placeholder="اكتب سعر البيع...")
+            p_stock = st.number_input("الكمية المتاحة حالياً بالمخزن", value=None, placeholder="اكتب كمية المخزن الأولية...", step=1)
             
-            if st.button("حفظ السلعة بالمخزن الأصلي"):
+            if st.button("حفظ السلعة"):
                 if p_name and p_today is not None and p_stock is not None:
                     cursor.execute("INSERT INTO products (name, today_price, stock, user_email) VALUES (?, ?, ?, ?)", (p_name, p_today, p_stock, user_email))
+                    # حفظ لقطة سعرية فورية لليوم الحالي
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    cursor.execute("INSERT INTO daily_price_snapshot VALUES (?, ?, ?, ?)", (p_name, p_today, today_str, user_email))
                     conn.commit()
-                    st.success(f"تم تسجيل {p_name} بالمخزن بنجاح!")
+                    st.success(f"تم تسجيل {p_name} بالمخزن وتثبيت سعرها!")
                     st.rerun()
                 else:
-                    st.error("❌ برجاء ملء كافة الخانات وتحديد البيانات أولاً!")
+                    st.error("❌ برجاء ملء كافة الخانات أولاً!")
                     
         st.markdown("---")
-        st.subheader("📋 قائمة إكسيل المنظمة لجرد المخزن")
-        prod_df = pd.read_sql_query("SELECT id as 'كود السلعة', name as 'اسم السلعة', today_price as 'سعر بيع اليوم ج.م', stock as 'الكمية المتاحة' FROM products WHERE user_email = ?", conn, params=(user_email,))
-        if not prod_df.empty:
-            st.dataframe(prod_df, use_container_width=True, hide_index=True)
+        st.subheader("📋 قائمة جرد المخزن وتحديث الأسعار المستمرة")
+        st.caption("💡 لتعديل سعر منتج بشكل دائم، اكتب السعر الجديد في خانته بجدول الإكسيل التفاعلي واضغط Go/تم بالآيفون.")
+        
+        # جلب المنتجات وعرضها في جدول إكسيل تفاعلي رائع يتيح التعديل المباشر للسعر والكمية
+        prod_data = pd.read_sql_query("SELECT id, name as 'اسم السلعة', today_price as 'سعر البيع ج.م', stock as 'الكمية الحالية' FROM products WHERE user_email = ?", conn)
+        
+        if not prod_data.empty:
+            edited_df = st.data_editor(prod_data, hide_index=True, use_container_width=True, disabled=["id", "اسم السلعة"])
             
-            with st.expander("🗑️ قسم حذف السلع من المخزن"):
-                del_id = st.selectbox("اختر السلعة المراد حذفها نهائياً", prod_df['كود السلعة'].tolist())
-                if st.button("تأكيد حذف السلعة المختارة"):
+            # رصد التغييرات وحفظها تلقائياً عند قيام المستخدم بالتعديل في جدول الإكسيل
+            for idx, row in edited_df.iterrows():
+                old_row = prod_data.iloc[idx]
+                if row['سعر البيع ج.م'] != old_row['سعر البيع ج.م'] or row['الكمية الحالية'] != old_row['الكمية الحالية']:
+                    cursor.execute("UPDATE products SET today_price = ?, stock = ? WHERE id = ? AND user_email = ?", (row['سعر البيع ج.م'], row['الكمية الحالية'], row['id'], user_email))
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    # تحديث أو إدخال اللقطة السعرية لليوم الحالي
+                    cursor.execute("DELETE FROM daily_price_snapshot WHERE product_name = ? AND snapshot_date = ? AND user_email = ?", (row['اسم السلعة'], today_str, user_email))
+                    cursor.execute("INSERT INTO daily_price_snapshot VALUES (?, ?, ?, ?)", (row['اسم السلعة'], row['سعر البيع ج.م'], today_str, user_email))
+                    conn.commit()
+                    st.toast(f"✅ تم حفظ التعديلات لـ {row['اسم السلعة']} وتعميمها!")
+                    st.rerun()
+
+            with st.expander("🗑️ قسم حذف السلع"):
+                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values[0])
+                if st.button("تأكيد الحذف"):
                     cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (del_id, user_email))
                     conn.commit()
                     st.rerun()
         else:
             st.info("المخزن فارغ تماماً.")
 
-    # --- التبويب الثالث: سجل الموردين والعملاء على شكل إكسيل ---
-    with tab3:
+    # --- 👥 التبويب الثاني: سجل الموردين لوحدهم وسجل العملاء لوحدهم ---
+    with tab2:
         st.subheader("🏭 سجل الموردين (الدائنين)")
         with st.expander("➕ إضافة مورد جديد للدفتر"):
             s_name = st.text_input("اسم المورد الجديد")
-            s_bal = st.number_input("حساب المورد الابتدائي (ج.م)", value=None, placeholder="اكتب الحساب المالي الافتتاحي...")
+            s_bal = st.number_input("حساب المورد الابتدائي (ج.م)", value=None, placeholder="الحساب الافتتاحي المستحق له...")
             if st.button("حفظ المورد"):
                 if s_name:
                     final_bal = s_bal if s_bal is not None else 0.0
                     cursor.execute("INSERT INTO suppliers (name, balance, user_email) VALUES (?, ?, ?)", (s_name, final_bal, user_email))
                     conn.commit()
                     st.rerun()
-        supp_df = pd.read_sql_query("SELECT id as 'كود المورد', name as 'اسم المورد', balance as 'الحساب المالي المستحق له ج.م' FROM suppliers WHERE user_email = ?", conn, params=(user_email,))
+        supp_df = pd.read_sql_query("SELECT id as 'كود المورد', name as 'اسم المورد', balance as 'الحساب المستحق له ج.م' FROM suppliers WHERE user_email = ?", conn, params=(user_email,))
         st.dataframe(supp_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
         st.subheader("👥 سجل العملاء (المدينين)")
         with st.expander("➕ إضافة عميل جديد للدفتر"):
             c_name = st.text_input("اسم العميل الجديد")
-            c_bal = st.number_input("حساب العميل المديونية الابتدائية (ج.م)", value=None, placeholder="اكتب مديونية العميل...")
+            c_bal = st.number_input("حساب العميل الابتدائي (ج.م)", value=None, placeholder="مديونية العميل الحالية...")
             if st.button("حفظ العميل"):
                 if c_name:
                     final_c_bal = c_bal if c_bal is not None else 0.0
-                    cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, final_c_bal, user_email))
-                    conn.commit()
-                    st.rerun()
