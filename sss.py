@@ -7,8 +7,8 @@ from datetime import datetime
 st.set_page_config(page_title="سيستم محل الجملة الشامل", layout="centered")
 st.markdown("<h1 style='text-align: center; color: #1E88E5;'>🚀 سيستم محل الجملة الشامل</h1>", unsafe_allow_html=True)
 
-# الاتصال بقاعدة البيانات المحلية المشتركة تلقائياً (إصدار محدث ومستقر)
-conn = sqlite3.connect('gomla_shop_v1_advanced_system.db', check_same_thread=False)
+# الاتصال بقاعدة البيانات (إصدار مستقر ونظيف تماماً)
+conn = sqlite3.connect('gomla_shop_v1_fixed_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الجداول الأساسية المباشرة للنظام
@@ -94,15 +94,14 @@ else:
         products = pd.read_sql_query("SELECT * FROM products WHERE user_email = ?", conn, params=(user_email,))
         
         if products.empty:
-            st.info("💡 لا توجد سلع مضافة حالياً. اذهب لتبويب 'المخزن والسلع الجديدة' لإضافة أول صنف لمحلك.")
+            st.info("💡 لا توجد سلع مضاة حالياً. اذهب لتبويب 'المخزن والسلع الجديدة' لإضافة أول صنف لمحلك.")
         else:
-            st.caption("💡 اكتب السعر الجديد واضغط على زر Go أو تم (Done) في كيبورد الآيفون ليتم حفظ السعر وتعميمه فوراً.")
+            st.caption("💡 اكتب السعر الجديد واضغط على زر Go أو تم (Done) في كيبورد الهاتف ليتم حفظ السعر وتعميمه فوراً.")
             for index, row in products.iterrows():
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"✨ **{row['name']}**\n\n(المخزن المتبقي: {row['stock']})")
                 with col2:
-                    # تعديل الخانات لتصبح فارغة تماماً بدون أصفار افتراضية
                     new_price = st.number_input(f"سعر البيع لليوم", value=None, placeholder="اكتب السعر هنا...", key=f"p_{row['id']}")
                     
                 if new_price is not None and new_price != row['today_price']:
@@ -121,7 +120,6 @@ with tab2:
     with st.expander("➕ إضافة عميل أو مورد جديد للدفتر"):
         name = st.text_input("اسم الشخص أو المحل")
         acc_type = st.selectbox("نوع الحساب", ["عميل (مدين - عليه فلوس)", "مورد (دائن - يطلب فلوس)"])
-        # خانة فارغة للمديونية الابتدائية
         balance = st.number_input("الحساب الحالي الإجمالي (ج.م)", value=None, placeholder="اكتب الحساب المالي المبدئي...")
         if st.button("حفظ الحساب في الدفتر المشترك"):
             if name:
@@ -139,7 +137,6 @@ with tab2:
 with tab3:
     st.subheader("➕ إضافة صنف/بضاعة جديدة للمخزن")
     new_p_name = st.text_input("اسم السلعة (مثال: طن أرز الفيروز)")
-    # خانات فارغة تماماً وسعر الشراء محذوف بالكامل بناءً على طلبك
     new_p_today = st.number_input("سعر البيع لليوم (ج.م)", value=None, placeholder="اكتب سعر بيع السلعة...")
     new_p_stock = st.number_input("الكمية المتوفرة بالمخزن", value=None, placeholder="اكتب كمية المخزن المتاحة...", step=1)
     
@@ -147,7 +144,6 @@ with tab3:
         if new_p_name and new_p_today is not None and new_p_stock is not None:
             cursor.execute("INSERT INTO products (name, today_price, stock, user_email) VALUES (?, ?, ?, ?)", 
                            (new_p_name, new_p_today, new_p_stock, user_email))
-            # حفظ لقطة سعرية أولية في سجل التواريخ
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
             current_month = datetime.now().strftime("%Y-%m")
             cursor.execute("INSERT INTO price_history VALUES (?, ?, ?, ?, ?)", (new_p_name, new_p_today, current_time, current_month, user_email))
@@ -162,15 +158,19 @@ with tab3:
     products_df = pd.read_sql_query("SELECT name as 'السلعة 📦', today_price as 'سعر البيع النشط ج.م 💰', stock as 'الكمية المتبقية 🧮' FROM products WHERE user_email = ?", conn, params=(user_email,))
     st.dataframe(products_df, use_container_width=True, hide_index=True)
 
-# --- التبويب الرابع: جداول أسعار الأيام السابقة والشهور والتواريخ (الأرشيف المتطور) ---
+# --- التبويب الرابع: أرشيف وجرد التواريخ السابقة ---
 with tab4:
     st.subheader("📅 أرشيف وجرد السلع والتواريخ السابقة")
-    search_mode = ft = st.radio("اختر طريقة جرد ومراجعة الأسعار السابقة:", ["🔍 جرد باليوم (التاريخ التفصيلي)", "📊 جرد بالشهور والأعوام"], horizontal=True)
+    search_mode = st.radio("اختر طريقة جرد ومراجع الأسعار السابقة:", ["🔍 جرد باليوم (التاريخ التفصيلي)", "📊 جرد بالشهور والأعوام"], horizontal=True)
     
     if search_mode == "🔍 جرد باليوم (التاريخ التفصيلي)":
         picked_date = st.date_input("اختر اليوم المراد مراجعة الأسعار فيه")
         date_str = picked_date.strftime("%Y-%m-%d")
         
         st.markdown(f"📋 **جدول الأسعار المسجلة في يوم {date_str}**")
-        day_df = pd.read_sql_query(
-            "SELECT product_name as 'اسم السلعة', price as 'سعر البيع المسجل ج.م', date as 'وقت التعديل الدقيق' FROM price_history WHERE user_email = ? AND date LIKE ?", 
+        # تم تصحيح القوس المسبب للقوس التالف في هذا السطر بالأسفل بدقة وعناية
+        day_df = pd.read_sql_query("SELECT product_name as 'اسم السلعة', price as 'سعر البيع المسجل ج.م', date as 'وقت التعديل الدقيق' FROM price_history WHERE user_email = ? AND date LIKE ?", conn, params=(user_email, f"{date_str}%"))
+        
+        if day_df.empty:
+            st.info("💡 لم يتم تعديل أي أسعار في هذا اليوم بالتحديد، الأسعار ظلت ثابتة ومستمرة كما هي.")
+        else:
