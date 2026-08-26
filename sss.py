@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
 # الاتصال بقاعدة بيانات جديدة ونظيفة تماماً لمنع أي تعارض مع الملفات القديمة
-conn = sqlite3.connect('gomla_perfect_v9_system.db', check_same_thread=False)
+conn = sqlite3.connect('gomla_perfect_v10_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الجداول المحاسبية المتطورة
@@ -94,7 +94,8 @@ else:
     with tab1:
         st.subheader("🏬 مستودع البضائع والأسعار الحالية")
         
-        with ft = st.expander("➕ إضافة سلعة جديدة للمخزن"):
+        # تم تصحيح السطر المسبب للمشكلة هنا وحذف كلمة ft = الزائدة
+        with st.expander("➕ إضافة سلعة جديدة للمخزن"):
             p_name = st.text_input("اسم السلعة الجديد")
             p_today = st.number_input("سعر البيع الحالي (ج.م)", value=None, placeholder="اكتب سعر البيع...")
             p_stock = st.number_input("الكمية المتاحة حالياً بالمخزن", value=None, placeholder="اكتب كمية المخزن الأولية...", step=1)
@@ -131,7 +132,7 @@ else:
                     st.rerun()
 
             with st.expander("🗑️ قسم حذف السلع"):
-                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values[0])
+                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values)
                 if st.button("تأكيد الحذف"):
                     cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (del_id, user_email))
                     conn.commit()
@@ -174,5 +175,3 @@ else:
             cust_df.columns = ['كود العميل', 'اسم العميل', 'المديونية المستحقة عليه ج.م']
         st.dataframe(cust_df, use_container_width=True, hide_index=True)
 
-    # --- التبويب الثالث: تسجيل الفواتير الذكي ---
-    with tab3:
