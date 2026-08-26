@@ -1,129 +1,80 @@
-import flet as ft
+import streamlit as st
 import sqlite3
+import pandas as pd
 from datetime import datetime
 
-# --- إعدادات قاعدة البيانات المحلية (للعمل بدون إنترنت) ---
-local_conn = sqlite3.connect("local_gomla.db", check_same_thread=False)
-local_cursor = local_conn.cursor()
+# إعداد واجهة النظام السحابي للموبايل والكمبيوتر
+st.set_page_config(page_title="سيستم محل الجملة الشامل", layout="centered")
+st.markdown("<h1 style='text-align: center; color: #1E88E5;'>🚀 سيستم محل الجملة الشامل</h1>", unsafe_allow_html=True)
 
-local_cursor.execute('''CREATE TABLE IF NOT EXISTS products 
-    (id TEXT PRIMARY KEY, name TEXT, purchase_price REAL, today_price REAL, stock INTEGER, last_updated TEXT)''')
-local_cursor.execute('''CREATE TABLE IF NOT EXISTS accounts 
-    (id TEXT PRIMARY KEY, name TEXT, type TEXT, balance REAL, user_email TEXT)''')
+# الاتصال بقاعدة البيانات السحابية المشتركة بين الأجهزة
+conn = sqlite3.connect('gomla_shared_system.db', check_same_thread=False)
+cursor = conn.cursor()
 
-# إضافة بيانات تجريبية للمخزن محلياً
-local_cursor.execute("SELECT count(*) FROM products")
-if local_cursor.fetchone() == 0:
-    local_cursor.execute("INSERT INTO products VALUES ('1', 'طن دقيق الهدى', 14000, 15000, 50, '2026-08-26')")
-    local_cursor.execute("INSERT INTO products VALUES ('2', 'كرتونة زيت سلايت', 650, 700, 100, '2026-08-26')")
-    local_conn.commit()
+# إنشاء الجداول الشاملة للنظام
+cursor.execute('''CREATE TABLE IF NOT EXISTS products 
+    (id INTEGER PRIMARY KEY, name TEXT, purchase_price REAL, today_price REAL, stock INTEGER)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS accounts 
+    (id INTEGER PRIMARY KEY, name TEXT, type TEXT, balance REAL)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS price_history 
+    (product_name TEXT, price REAL, date TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS invoices 
+    (id INTEGER PRIMARY KEY, account_name TEXT, total REAL, date TEXT, type TEXT)''')
 
+# إضافة بضاعة تجريبية للمخزن إذا كان فارغاً
+cursor.execute("SELECT count(*) FROM products")
+if cursor.fetchone() == 0:
+    cursor.execute("INSERT INTO products (name, purchase_price, today_price, stock) VALUES ('طن دقيق الهدى', 14000, 15000, 50)")
+    cursor.execute("INSERT INTO products (name, purchase_price, today_price, stock) VALUES ('كرتونة زيت سلايت', 650, 700, 100)")
+    conn.commit()
 
-def main(page: ft.Page):
-    page.title = "سيستم محل الجملة المشترك"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.scroll = "adaptive"
+# قائمة التنقل العلوية المريحة للموبايل
+menu = ft = st.tabs(["📊 أسعار اليوم", "👥 الديون والحسابات", "🧾 الفواتير والمخزن"])
+
+# --- 1. شاشة تحديث الأسعار اليومية ---
+with menu[0]:
+    st.subheader("تحديث أسعار السلع لحظياً")
+    products = pd.read_sql_query("SELECT * FROM products", conn)
     
-    # متغيرات حفظ جلسة المستخدم
-    user_email = ft.Ref[ft.TextField]()
-    user_password = ft.Ref[ft.TextField]()
-    current_user = None
+    for index, row in products.iterrows():
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.write(f"✨ **{row['name']}**\n(سعر الشراء: {row['purchase_price']} ج.م | المخزن: {row['stock']})")
+        with col2:
+            new_price = st.number_input(f"سعر البيع اليوم", value=float(row['today_price']), key=f"p_{row['id']}")
+            
+        if new_price != row['today_price']:
+            cursor.execute("UPDATE products SET today_price = ? WHERE id = ?", (new_price, row['id']))
+            cursor.execute("INSERT INTO price_history VALUES (?, ?, ?)", (row['name'], new_price, datetime.now().strftime("%Y-%m-%d %H:%M")))
+            conn.commit()
+            st.toast(f"✅ تم تحديث سعر {row['name']} على جميع الأجهزة!")
 
-    # --- شاشة تسجيل الدخول ---
-    def login_click(e):
-        nonlocal current_user
-        if user_email.current.value and user_password.current.value:
-            current_user = user_email.current.value
-            page.controls.clear()
-            show_main_dashboard()
-            page.update()
-        else:
-            page.snack_bar = ft.SnackBar(ft.Text("برجاء إدخال الحساب وكلمة المرور"))
-            page.snack_bar.open = True
-            page.update()
+# --- 2. شاشة الديون والحسابات (الداين والمدين) ---
+with menu[1]:
+    st.subheader("دفتر ديون العملاء والموردين")
+    
+    with st.expander("➕ إضافة عميل أو مورد جديد للدفتر"):
+        name = st.text_input("اسم الشخص أو المحل")
+        acc_type = st.selectbox("نوع الحساب", ["عميل (مدين - عليه فلوس)", "مورد (دائن - يطلب فلوس)"])
+        balance = st.number_input("الحساب الحالي الإجمالي (ج.م)", value=0.0)
+        if st.button("حفظ الحساب في الدفتر"):
+            if name:
+                cursor.execute("INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)", (name, acc_type, balance))
+                conn.commit()
+                st.success(f"تم تسجيل {name} بنجاح!")
+                st.rerun()
 
-    def show_login_screen():
-        login_box = ft.Column(
-            [
-                ft.Text("🔐 تسجيل دخول النظام المشترك", size=24, weight=ft.FontWeight.BOLD),
-                ft.TextField(ref=user_email, label="البريد الإلكتروني المشترك", keyboard_type=ft.KeyboardType.EMAIL),
-                ft.TextField(ref=user_password, label="كلمة المرور", password=True, can_reveal_password=True),
-                ft.ElevatedButton("دخول ومزامنة الأجهزة", on_click=login_click, width=250, bgcolor=ft.Colors.BLUE_ACCENT),
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER
-        )
-        page.add(ft.Container(content=login_box, padding=40))
+    # عرض الحسابات الإجمالية للعملاء والموردين
+    st.markdown("### 📋 قائمة الحسابات الحالية")
+    accounts_df = pd.read_sql_query("SELECT name as 'الاسم', type as 'النوع', balance as 'الحساب الحالي (ج.م)' FROM accounts", conn)
+    st.dataframe(accounts_df, use_container_width=True)
 
-    # --- شاشة الإدارة الرئيسية وتحديث الأسعار ---
-    def show_main_dashboard():
-        page.clean()
-        
-        # ترويسة التطبيق تظهر الحساب النشط
-        page.add(
-            ft.Container(
-                content=ft.Row([
-                    ft.Text(f"👤 الحساب: {current_user}", size=14, color=ft.Colors.GREEN_ACCENT),
-                    ft.IconButton(ft.Icons.REFRESH, on_click=lambda e: refresh_data(), tooltip="مزامنة وتحديث الأسعار")
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                bgcolor=ft.Colors.SURFACE_CONTAINER, padding=10, border_radius=8
-            )
-        )
-
-        # قائمة المنتجات وتحديث الأسعار
-        product_list = ft.Column(scroll="adaptive", expand=True)
-        
-        def load_products():
-            product_list.controls.clear()
-            local_cursor.execute("SELECT * FROM products")
-            for row in local_cursor.fetchall():
-                p_id, name, p_price, t_price, stock, _ = row
-                
-                price_input = ft.TextField(
-                    value=str(t_price), width=100, 
-                    keyboard_type=ft.KeyboardType.NUMBER,
-                    on_submit=lambda e, pid=p_id: update_product_price(pid, e.control.value)
-                )
-
-                # تم تعديل .add إلى .append هنا لحل المشكلة تماماً
-                product_list.controls.append(
-                    ft.Card(
-                        content=ft.Container(
-                            content=ft.Row([
-                                ft.Column([
-                                    ft.Text(name, size=16, weight=ft.FontWeight.BOLD),
-                                    ft.Text(f"شراء: {p_price} ج.م | مخزن: {stock}", size=12, color=ft.Colors.GREY_400)
-                                ], expand=True),
-                                price_input
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                            padding=10
-                        )
-                    )
-                )
-            page.update()
-
-        def update_product_price(pid, new_value):
-            try:
-                new_price = float(new_value)
-                local_cursor.execute("UPDATE products SET today_price = ?, last_updated = ? WHERE id = ?", 
-                                     (new_price, datetime.now().strftime("%Y-%m-%d %H:%M"), pid))
-                local_conn.commit()
-                page.snack_bar = ft.SnackBar(ft.Text("تم حفظ السعر محلياً! سيتم رفعه تلقائياً عند توفر شبكة"))
-                page.snack_bar.open = True
-                load_products()
-            except ValueError:
-                pass
-
-        def refresh_data():
-            page.snack_bar = ft.SnackBar(ft.Text("🔄 جاري مزامنة البيانات بين الهواتف المشتركة..."))
-            page.snack_bar.open = True
-            page.update()
-            load_products()
-
-        page.add(ft.Text("📊 أسعار السلع اليومية", size=20, weight=ft.FontWeight.BOLD))
-        page.add(product_list)
-        load_products()
-
-    # بدء تشغيل شاشة تسجيل الدخول أولاً
-    show_login_screen()
-
-ft.app(target=main)
+# --- 3. شاشة الفواتير والمخزن وأرشيف الأسعار ---
+with menu[2]:
+    st.subheader("📦 حالة المخزن الحالي")
+    products_df = pd.read_sql_query("SELECT name as 'السلعة', today_price as 'سعر اليوم', stock as 'الكمية المتبقية' FROM products", conn)
+    st.table(products_df)
+    
+    st.subheader("📈 أرشيف حركات الأسعار اليومية")
+    history_df = pd.read_sql_query("SELECT product_name as 'السلعة', price as 'السعر المسجل', date as 'التاريخ والوقت' FROM price_history ORDER BY date DESC", conn)
+    st.dataframe(history_df, use_container_width=True)
