@@ -13,7 +13,7 @@ cursor = conn.cursor()
 # إنشاء الجداول المحاسبية المتطورة
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS products 
-    (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, purchase_price REAL, today_price REAL, stock INTEGER, user_email TEXT)''')
+    (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, today_price REAL, stock INTEGER, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS suppliers 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS customers 
@@ -89,7 +89,7 @@ else:
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
     # التبويبات والمجلدات الحسابية المفصلة
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 أسعار البيع اليومية", "🏬 إدارة المخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير", "📅 أرشيف السجلات والتاريخ"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 أسعار البيع اليومية", "📦 إدارة المخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير", "📅 أرشيف السجلات والتاريخ"])
 
     # --- التبويب الأول: قائمة تعديل الأسعار اليومية فقط لليوم الحالي ---
     with tab1:
@@ -97,16 +97,16 @@ else:
         products_df = pd.read_sql_query("SELECT * FROM products WHERE user_email = ?", conn, params=(user_email,))
         
         if products_df.empty:
-            st.info("💡 المخزن فارغ. أضف بعض المنتجات من تبويب 'إدارة المخزن' لتتحكم in أسعار اليوم هنا.")
+            st.info("💡 المخزن فارغ. أضف بعض المنتجات من تبويب 'إدارة المخزن' لتتحكم في أسعار اليوم هنا.")
         else:
+            st.caption("💡 بعد كتابة السعر، اضغط على زر 'Go' أو 'تم' (Done) في كيبورد الآيفون لحفظ السعر وتعميمه فوراً.")
             for index, row in products_df.iterrows():
                 st.markdown(f"📦 **{row['name']}**")
-                # تم تصحيح السطر المسبب للمشكلة هنا بتحديد رقم 2 لتقسيم الشاشة بدقة
                 c_info, c_input = st.columns(2)
                 with c_info:
-                    st.write(f"(تكلفة الشراء: {row['purchase_price']} ج.م | المخزن الحالي: {row['stock']})")
+                    st.write(f"(المخزن الحالي: {row['stock']})")
                 with c_input:
-                    new_price = st.number_input(f"سعر البيع لليوم", value=None, placeholder="اكتب السعر وضغط Enter...", key=f"sale_p_{row['id']}")
+                    new_price = st.number_input(f"سعر البيع لليوم", value=None, placeholder="اكتب السعر وضغط Go...", key=f"sale_p_{row['id']}")
                     
                 if new_price is not None and new_price != row['today_price']:
                     cursor.execute("UPDATE products SET today_price = ? WHERE id = ? AND user_email = ?", (new_price, row['id'], user_email))
@@ -121,22 +121,22 @@ else:
         st.subheader("📦 إدارة أصل البضائع والمخزن")
         with st.expander("➕ إضافة بضاعة/سلعة جديدة للمخزن الأصلي"):
             p_name = st.text_input("اسم السلعة")
-            p_purchase = st.number_input("سعر التكلفة/الشراء (ج.م)", value=None, placeholder="اكتب سعر الشراء...")
-            p_today = st.number_input("سعر البيع الابتدائي (ج.م)", value=None, placeholder="اكتب سعر البيع...")
-            p_stock = st.number_input("الكمية المتاحة", value=None, placeholder="اكتب الكمية بالعد...", step=1)
+            # تم حذف خانة سعر الشراء تماماً من هنا
+            p_today = st.number_input("سعر البيع الابتدائي (ج.م)", value=None, placeholder="اكتب سعر البيع الافتتاحي...")
+            p_stock = st.number_input("الكمية المتاحة بالمخزن", value=None, placeholder="اكتب الكمية المتاحة حالياً...", step=1)
             
             if st.button("حفظ السلعة بالمخزن الأصلي"):
-                if p_name and p_purchase is not None and p_today is not None and p_stock is not None:
-                    cursor.execute("INSERT INTO products (name, purchase_price, today_price, stock, user_email) VALUES (?, ?, ?, ?, ?)", (p_name, p_purchase, p_today, p_stock, user_email))
+                if p_name and p_today is not None and p_stock is not None:
+                    cursor.execute("INSERT INTO products (name, today_price, stock, user_email) VALUES (?, ?, ?, ?)", (p_name, p_today, p_stock, user_email))
                     conn.commit()
-                    st.success(f"تم تسجيل {p_name} بالمخزن!")
+                    st.success(f"تم تسجيل {p_name} بالمخزن بنجاح!")
                     st.rerun()
                 else:
-                    st.error("❌ برجاء ملء كافة الخانات وتحديد الأسعار أولاً!")
+                    st.error("❌ برجاء ملء كافة الخانات وتحديد البيانات أولاً!")
                     
         st.markdown("---")
         st.subheader("📋 قائمة إكسيل المنظمة لجرد المخزن")
-        prod_df = pd.read_sql_query("SELECT id as 'كود السلعة', name as 'اسم السلعة', purchase_price as 'سعر الشراء ج.م', today_price as 'سعر بيع اليوم ج.م', stock as 'الكمية المتاحة' FROM products WHERE user_email = ?", conn, params=(user_email,))
+        prod_df = pd.read_sql_query("SELECT id as 'كود السلعة', name as 'اسم السلعة', today_price as 'سعر بيع اليوم ج.م', stock as 'الكمية المتاحة' FROM products WHERE user_email = ?", conn, params=(user_email,))
         if not prod_df.empty:
             st.dataframe(prod_df, use_container_width=True, hide_index=True)
             
@@ -172,3 +172,6 @@ else:
             if st.button("حفظ العميل"):
                 if c_name:
                     final_c_bal = c_bal if c_bal is not None else 0.0
+                    cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, final_c_bal, user_email))
+                    conn.commit()
+                    st.rerun()
