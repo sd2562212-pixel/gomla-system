@@ -46,8 +46,8 @@ if not st.session_state.logged_in:
 else:
     user_email = st.session_state.user_email
     
-    # ترويسة التطبيق تظهر الحساب النشط وزر خروج
-    col_user, col_logout = st.columns()
+    # تم تصحيح السطر المسبب للخطأ هنا بتحديد رقم 2 بين القوسين لتفادي التوقف
+    col_user, col_logout = st.columns(2)
     with col_user:
         st.markdown(f"🟢 **متصل ومزامن:** `{user_email}`")
     with col_logout:
@@ -58,7 +58,7 @@ else:
             
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
-    # التبويبات الرئيسية للنظام (تم تصحيح السطر هنا)
+    # التبويبات الرئيسية للنظام
     tab1, tab2, tab3 = st.tabs(["📊 أسعار اليوم والمخزن", "👥 الديون والحسابات", "📅 مرجعيات وأرشيف الأسعار"])
 
     # --- التبويب الأول: تحديث الأسعار والسلع اليومية ---
@@ -91,7 +91,7 @@ else:
         else:
             for index, row in products_df.iterrows():
                 st.markdown(f"📦 **{row['name']}**")
-                c1, c2, c3 = st.columns([2, 2, 1])
+                c1, c2, c3 = st.columns(3) # تم التعديل هنا أيضاً لضمان استقرار العرض
                 with c1:
                     st.write(f"(الشراء: {row['purchase_price']} | المخزن: {row['stock']})")
                 with c2:
