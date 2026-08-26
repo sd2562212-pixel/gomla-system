@@ -1,13 +1,13 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # إعداد واجهة النظام السحابي
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
-# الاتصال بقاعدة البيانات السحابية المشتركة
-conn = sqlite3.connect('gomla_ultimate_auto_system.db', check_same_thread=False)
+# الحل: تم تغيير اسم قاعدة البيانات هنا لتوليد جداول نظيفة ومتوافقة تماماً ومنع الخطأ
+conn = sqlite3.connect('gomla_final_stable_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الجداول المحاسبية المتطورة
@@ -18,7 +18,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS suppliers
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS customers 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
-# جدول متطور لحفظ لقطة يومية للأسعار (سجل المرجعيات التاريخي)
 cursor.execute('''CREATE TABLE IF NOT EXISTS daily_price_snapshot 
     (product_name TEXT, price REAL, snapshot_date TEXT, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS invoices 
@@ -53,7 +52,7 @@ if not st.session_state.logged_in:
                     except sqlite3.IntegrityError:
                         st.error("⚠️ هذا البريد الإلكتروني مسجل بالفعل بالنظام من قبل!")
                 else:
-                    st.error("❌ كلمات الور غير متطابقة")
+                    st.error("❌ كلمات المرور غير متطابقة")
             else:
                 st.error("برجاء ملء جميع الخانات")
 
@@ -89,7 +88,7 @@ else:
             
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
-    # التبويبات المحاسبية المتطورة الجديدة والمفصلة تماماً
+    # التبويبات المحاسبية المتطورة
     tab1, tab2, tab3, tab4 = st.tabs(["📦 إدارة السلع والمخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير الذكي", "📅 المرجعيات والأرشيف التاريخي"])
 
     # --- التبويب الأول: إدارة المخزن والأسعار الحالية وحفظ اللقطة اليومية ---
@@ -104,7 +103,6 @@ else:
             if st.button("حفظ السلعة"):
                 if p_name and p_today is not None and p_stock is not None:
                     cursor.execute("INSERT INTO products (name, today_price, stock, user_email) VALUES (?, ?, ?, ?)", (p_name, p_today, p_stock, user_email))
-                    # حفظ لقطة سعرية فورية لليوم الحالي
                     today_str = datetime.now().strftime("%Y-%m-%d")
                     cursor.execute("INSERT INTO daily_price_snapshot VALUES (?, ?, ?, ?)", (p_name, p_today, today_str, user_email))
                     conn.commit()
@@ -115,21 +113,17 @@ else:
                     
         st.markdown("---")
         st.subheader("📋 قائمة جرد المخزن وتحديث الأسعار المستمرة")
-        st.caption("💡 لتعديل سعر منتج بشكل دائم، اكتب السعر الجديد في خانته بجدول الإكسيل التفاعلي واضغط Go/تم بالآيفون.")
         
-        # جلب المنتجات وعرضها في جدول إكسيل تفاعلي رائع يتيح التعديل المباشر للسعر والكمية
         prod_data = pd.read_sql_query("SELECT id, name as 'اسم السلعة', today_price as 'سعر البيع ج.م', stock as 'الكمية الحالية' FROM products WHERE user_email = ?", conn)
         
         if not prod_data.empty:
             edited_df = st.data_editor(prod_data, hide_index=True, use_container_width=True, disabled=["id", "اسم السلعة"])
             
-            # رصد التغييرات وحفظها تلقائياً عند قيام المستخدم بالتعديل في جدول الإكسيل
             for idx, row in edited_df.iterrows():
                 old_row = prod_data.iloc[idx]
                 if row['سعر البيع ج.م'] != old_row['سعر البيع ج.م'] or row['الكمية الحالية'] != old_row['الكمية الحالية']:
                     cursor.execute("UPDATE products SET today_price = ?, stock = ? WHERE id = ? AND user_email = ?", (row['سعر البيع ج.م'], row['الكمية الحالية'], row['id'], user_email))
                     today_str = datetime.now().strftime("%Y-%m-%d")
-                    # تحديث أو إدخال اللقطة السعرية لليوم الحالي
                     cursor.execute("DELETE FROM daily_price_snapshot WHERE product_name = ? AND snapshot_date = ? AND user_email = ?", (row['اسم السلعة'], today_str, user_email))
                     cursor.execute("INSERT INTO daily_price_snapshot VALUES (?, ?, ?, ?)", (row['اسم السلعة'], row['سعر البيع ج.م'], today_str, user_email))
                     conn.commit()
@@ -145,7 +139,7 @@ else:
         else:
             st.info("المخزن فارغ تماماً.")
 
-    # --- 👥 التبويب الثاني: سجل الموردين لوحدهم وسجل العملاء لوحدهم ---
+    # --- 👥 التبويب الثاني: سجل الموردين والعملاء ---
     with tab2:
         st.subheader("🏭 سجل الموردين (الدائنين)")
         with st.expander("➕ إضافة مورد جديد للدفتر"):
@@ -157,7 +151,7 @@ else:
                     cursor.execute("INSERT INTO suppliers (name, balance, user_email) VALUES (?, ?, ?)", (s_name, final_bal, user_email))
                     conn.commit()
                     st.rerun()
-        supp_df = pd.read_sql_query("SELECT id as 'كود المورد', name as 'اسم المورد', balance as 'الحساب المستحق له ج.م' FROM suppliers WHERE user_email = ?", conn, params=(user_email,))
+        supp_df = pd.read_sql_query("SELECT id as 'كود المورد', name as 'اسم المورد', balance as 'الحساب المستحق له ج.م' FROM suppliers WHERE user_email = ?", conn)
         st.dataframe(supp_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
@@ -168,3 +162,12 @@ else:
             if st.button("حفظ العميل"):
                 if c_name:
                     final_c_bal = c_bal if c_bal is not None else 0.0
+                    cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, final_c_bal, user_email))
+                    conn.commit()
+                    st.rerun()
+        cust_df = pd.read_sql_query("SELECT id as 'كود العميل', name as 'اسم العميل', balance as 'المديونية المستحقة عليه ج.م' FROM customers WHERE user_email = ?", conn)
+        st.dataframe(cust_df, use_container_width=True, hide_index=True)
+
+    # --- 🧾 التبويب الثالث: تسجيل الفواتير الذكي ---
+    with tab3:
+        st.subheader("🧾 إنشاء وتسجيل فاتورة حركية ذكية")
