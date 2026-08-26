@@ -6,11 +6,11 @@ from datetime import datetime
 # إعداد واجهة النظام السحابي
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
-# الحل القاطع: الاتصال باسم قاعدة بيانات جديد تماماً لضمان تصفير الكاش القديم
-conn = sqlite3.connect('gomla_clean_v5_system.db', check_same_thread=False)
+# الاتصال بقاعدة بيانات جديدة ونظيفة لضمان استقرار العمل
+conn = sqlite3.connect('gomla_perfect_final_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
-# إنشاء وتحديث الجداول المحاسبية المتطورة تلقائياً لمنع أي تعارض
+# إنشاء وتحديث الجداول المحاسبية المتطورة
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS products 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, today_price REAL, stock INTEGER, user_email TEXT)''')
@@ -114,7 +114,6 @@ else:
         st.markdown("---")
         st.subheader("📋 قائمة جرد المخزن وتحديث الأسعار المستمرة")
         
-        # استعلام جلب البيانات المباشر لتجنب أخطاء الباندا
         try:
             prod_data = pd.read_sql_query("SELECT id, name, today_price, stock FROM products WHERE user_email = ?", conn)
         except:
@@ -176,3 +175,5 @@ else:
                     conn.commit()
                     st.rerun()
         try:
+            cust_df = pd.read_sql_query("SELECT id, name, balance FROM customers WHERE user_email = ?", conn)
+            if not cust_df.empty:
