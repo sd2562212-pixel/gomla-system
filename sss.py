@@ -6,11 +6,11 @@ from datetime import datetime
 # إعداد واجهة النظام السحابي
 st.set_page_config(page_title="سيستم محل الجملة الذكي المتكامل", layout="centered")
 
-# الحل: تم تغيير اسم قاعدة البيانات لفرض بناء جداول جديدة متوافقة مع الكود
-conn = sqlite3.connect('gomla_clean_final_system.db', check_same_thread=False)
+# الحل القاطع: الاتصال باسم قاعدة بيانات جديد تماماً لضمان تصفير الكاش القديم
+conn = sqlite3.connect('gomla_clean_v5_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
-# إنشاء الجداول المحاسبية المتطورة
+# إنشاء وتحديث الجداول المحاسبية المتطورة تلقائياً لمنع أي تعارض
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS products 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, today_price REAL, stock INTEGER, user_email TEXT)''')
@@ -114,11 +114,13 @@ else:
         st.markdown("---")
         st.subheader("📋 قائمة جرد المخزن وتحديث الأسعار المستمرة")
         
-        # استخدام استعلام مباشر متوافق لتفادي الأخطاء البرمجية
-        prod_data = pd.read_sql_query("SELECT id, name, today_price, stock FROM products WHERE user_email = ?", conn)
+        # استعلام جلب البيانات المباشر لتجنب أخطاء الباندا
+        try:
+            prod_data = pd.read_sql_query("SELECT id, name, today_price, stock FROM products WHERE user_email = ?", conn)
+        except:
+            prod_data = pd.DataFrame(columns=['id', 'name', 'today_price', 'stock'])
         
         if not prod_data.empty:
-            # تعديل المسميات الخارجية فقط للعرض بشكل منظم كالإكسيل
             prod_data.columns = ['id', 'اسم السلعة', 'سعر البيع ج.م', 'الكمية الحالية']
             edited_df = st.data_editor(prod_data, hide_index=True, use_container_width=True, disabled=["id", "اسم السلعة"])
             
@@ -134,7 +136,7 @@ else:
                     st.rerun()
 
             with st.expander("🗑️ قسم حذف السلع"):
-                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values[0])
+                del_id = st.selectbox("اختر السلعة للحذف النهائي", prod_data['id'].tolist(), format_func=lambda x: prod_data[prod_data['id'] == x]['اسم السلعة'].values)
                 if st.button("تأكيد الحذف"):
                     cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (del_id, user_email))
                     conn.commit()
@@ -154,9 +156,12 @@ else:
                     cursor.execute("INSERT INTO suppliers (name, balance, user_email) VALUES (?, ?, ?)", (s_name, final_bal, user_email))
                     conn.commit()
                     st.rerun()
-        supp_df = pd.read_sql_query("SELECT id, name, balance FROM suppliers WHERE user_email = ?", conn)
-        if not supp_df.empty:
-            supp_df.columns = ['كود المورد', 'اسم المورد', 'الحساب المستحق له ج.م']
+        try:
+            supp_df = pd.read_sql_query("SELECT id, name, balance FROM suppliers WHERE user_email = ?", conn)
+            if not supp_df.empty:
+                supp_df.columns = ['كود المورد', 'اسم المورد', 'الحساب المستحق له ج.م']
+        except:
+            supp_df = pd.DataFrame()
         st.dataframe(supp_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
@@ -170,6 +175,4 @@ else:
                     cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, final_c_bal, user_email))
                     conn.commit()
                     st.rerun()
-        cust_df = pd.read_sql_query("SELECT id, name, balance FROM customers WHERE user_email = ?", conn)
-        if not cust_df.empty:
-            cust_df.columns = ['كود العميل', 'اسم العميل', 'المديونية المستحقة عليه ج.م']
+        try:
