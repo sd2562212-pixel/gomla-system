@@ -1,13 +1,12 @@
-
 import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime
 
 # إعداد واجهة النظام السحابي الحديثة جداً
-st.set_page_config(page_title="منظومة الإدارة المالية الذكية", layout="centered")
+st.set_page_config(page_title="منظومة الإدارة المالية الذكية للمحل", layout="centered")
 
-# تصميم بصري متطور جداً (Premium Dark-Tech UI)
+# تصميم بصري متطور جداً واحترافي (Premium Dark-Tech UI)
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { gap: 10px; justify-content: center; }
@@ -25,8 +24,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# الحل الجذري: الاتصال بقاعدة بيانات جديدة كلياً لتفادي تضارب القوائم والجداول القديمة
-conn = sqlite3.connect('gomla_perfect_v12_system.db', check_same_thread=False)
+# الاتصال بقاعدة بيانات جديدة ونظيفة ومستقرة تماماً لمنع تعارض الكاش القديم
+conn = sqlite3.connect('gomla_modern_final_perfect_v15.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # إنشاء الهيكل المحاسبي الشامل والمتطور للمحل
@@ -174,4 +173,3 @@ else:
                 old_row = prod_data.iloc[idx]
                 if row['سعر البيع ج.م 💰'] != old_row['سعر البيع ج.م 💰'] or row['الكمية المتاحة حالياً 🧮'] != old_row['الكمية المتاحة حالياً 🧮']:
                     cursor.execute("UPDATE products SET today_price = ?, stock = ? WHERE id = ? AND user_email = ?", (row['سعر البيع ج.م 💰'], row['الكمية المتاحة حالياً 🧮'], row['الكود'], user_email))
-                    today_str = datetime.now().strftime("%Y-%m-%d")
