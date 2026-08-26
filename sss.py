@@ -4,21 +4,24 @@ import pandas as pd
 from datetime import datetime
 
 # إعداد واجهة النظام السحابي
-st.set_page_config(page_title="سيستم محل الجملة الاحترافي", layout="centered")
+st.set_page_config(page_title="سيستم الإدارة المالية الشامل لجملة المحل", layout="centered")
 
 # الاتصال بقاعدة البيانات السحابية المشتركة
-conn = sqlite3.connect('gomla_advanced_system.db', check_same_thread=False)
+conn = sqlite3.connect('gomla_ultimate_system.db', check_same_thread=False)
 cursor = conn.cursor()
 
-# إنشاء الجداول (إضافة جدول المستخدمين الجدد)
-cursor.execute('''CREATE TABLE IF NOT EXISTS users 
-    (email TEXT PRIMARY KEY, password TEXT)''')
+# إنشاء الجداول المحاسبية المتطورة والمفصلة
+cursor.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS products 
     (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, purchase_price REAL, today_price REAL, stock INTEGER, user_email TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS accounts 
-    (id INTEGER PRIMARY KEY, name TEXT, type TEXT, balance REAL, user_email TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS suppliers 
+    (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS customers 
+    (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, balance REAL, user_email TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS price_history 
     (product_name TEXT, old_price REAL, new_price REAL, date TEXT, user_email TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS invoices 
+    (id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_type TEXT, party_name TEXT, total_amount REAL, date TEXT, user_email TEXT)''')
 
 conn.commit()
 
@@ -28,21 +31,18 @@ if "logged_in" not in st.session_state:
 if "user_email" not in st.session_state:
     st.session_state.user_email = ""
 
-# --- 1. شاشات الحسابات الموحدة ---
+# --- 1. شاشات الحسابات الموحدة وبوابة الحماية ---
 if not st.session_state.logged_in:
-    # اختيار وضع الشاشة (تسجيل دخول أو إنشاء حساب)
     auth_mode = st.radio("اختر العملية المراد القيام بها:", ["🔑 تسجيل دخول بحساب سابق", "➕ إنشاء حساب جديد للمحل"], horizontal=True)
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
     if auth_mode == "➕ إنشاء حساب جديد للمحل":
         st.markdown("<h3 style='text-align: center; color: #4CAF50;'>📝 إنشاء حساب جديد للمحل</h3>", unsafe_allow_html=True)
-        st.write("استخدم هذا القسم لإنشاء حساب المحل لأول مرة فقط، ثم وزع الإيميل والباسورد على الموظفين.")
-        
         new_email = st.text_input("البريد الإلكتروني الجديد (Email)", key="reg_email").strip().lower()
         new_password = st.text_input("اختر كلمة المرور (Password)", type="password", key="reg_pass")
         confirm_password = st.text_input("تأكيد كلمة المرور", type="password", key="reg_confirm")
         
-        if st.button("تأجيل وإنشاء الحساب الحركي", use_container_width=True):
+        if st.button("تأكيد وإنشاء الحساب الحركي", use_container_width=True):
             if new_email and new_password:
                 if new_password == confirm_password:
                     try:
@@ -58,23 +58,18 @@ if not st.session_state.logged_in:
 
     elif auth_mode == "🔑 تسجيل دخول بحساب سابق":
         st.markdown("<h3 style='text-align: center; color: #1E88E5;'>🔐 تسجيل دخول النظام المشترك</h3>", unsafe_allow_html=True)
-        st.write("أدخل البريد الإلكتروني الذي قمت بإنشائه سابقاً لربط هذا الهاتف بالمخزن.")
-        
         email_input = st.text_input("البريد الإلكتروني (Email)", key="log_email").strip().lower()
         password_input = st.text_input("كلمة المرور (Password)", type="password", key="log_pass")
         
         if st.button("دخول ومزامنة الأجهزة", use_container_width=True):
             if email_input and password_input:
-                # التحقق من وجود الحساب في قاعدة البيانات
                 cursor.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email_input, password_input))
-                user_record = cursor.fetchone()
-                
-                if user_record:
+                if cursor.fetchone():
                     st.session_state.logged_in = True
                     st.session_state.user_email = email_input
                     st.rerun()
                 else:
-                    st.error("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة! تأكد من كتابتهم بدقة أو قم بإنشاء حساب جديد.")
+                    st.error("❌ البيانات غير صحيحة!")
             else:
                 st.error("برجاء إدخال البيانات المطلوبة")
 
@@ -93,90 +88,93 @@ else:
             
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["📊 أسعار اليوم والمخزن", "👥 الديون والحسابات", "📅 مرجعيات وأرشيف الأسعار"])
+    # التبويبات والمجلدات الحسابية المفصلة والجديدة للسيستم
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 أسعار البيع اليومية", "🏬 إدارة المخزن", "👥 الموردين والعملاء", "🧾 تسجيل الفواتير", "📅 أرشيف السجلات والتاريخ"])
 
-    # --- التبويب الأول: إدارة المخزن وتحديث الأسعار ---
+    # --- التبويب الأول: قائمة تعديل الأسعار اليومية فقط لليوم الحالي ---
     with tab1:
-        st.subheader("إدارة مخزن وبضاعة المحل")
-        
-        with st.expander("➕ إضافة بضاعة/سلعة جديدة للمخزن"):
-            new_p_name = st.text_input("اسم السلعة (مثال: طن أرز الفيروز)")
-            new_p_purchase = st.number_input("سعر الشراء الحالي (ج.م)", value=0.0)
-            new_p_today = st.number_input("سعر البيع الافتتاحي لليوم (ج.م)", value=0.0)
-            new_p_stock = st.number_input("الكمية المتوفرة بالمخزن", value=0, step=1)
-            
-            if st.button("حفظ السلعة بالمخزن المشترك"):
-                if new_p_name:
-                    cursor.execute("INSERT INTO products (name, purchase_price, today_price, stock, user_email) VALUES (?, ?, ?, ?, ?)", 
-                                   (new_p_name, new_p_purchase, new_p_today, new_p_stock, user_email))
-                    conn.commit()
-                    st.success(f"تمت إضافة {new_p_name} للمخزن بنجاح!")
-                    st.rerun()
-        
-        st.markdown("---")
-        st.subheader("🔄 تحديث أسعار السلع لحظياً")
-        
+        st.subheader("🔄 تعديل أسعار البيع اليومية لحظياً")
         products_df = pd.read_sql_query("SELECT * FROM products WHERE user_email = ?", conn, params=(user_email,))
         
         if products_df.empty:
-            st.info("💡 المخزن فارغ حالياً. قم بالضغط على الزر بالأعلى لإضافة أول سلعة لمحلك بيدك.")
+            st.info("💡 المخزن فارغ. أضف بعض المنتجات من تبويب 'إدارة المخزن' لتتحكم في أسعار اليوم هنا.")
         else:
             for index, row in products_df.iterrows():
                 st.markdown(f"📦 **{row['name']}**")
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    st.write(f"(الشراء: {row['purchase_price']} | المخزن: {row['stock']})")
-                with c2:
-                    new_price = st.number_input(f"سعر اليوم", value=float(row['today_price']), key=f"p_{row['id']}")
-                with c3:
-                    if st.button("🗑️ حذف", key=f"del_{row['id']}"):
-                        cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (row['id'], user_email))
-                        conn.commit()
-                        st.toast(f"❌ تم حذف {row['name']}")
-                        st.rerun()
+                c_info, c_input = st.columns([2, 1])
+                with c_info:
+                    st.write(f"(تكلفة الشراء: {row['purchase_price']} ج.م | المخزن الحالي: {row['stock']})")
+                with c_input:
+                    new_price = st.number_input(f"سعر البيع لليوم", value=float(row['today_price']), key=f"sale_p_{row['id']}")
                     
                 if new_price != row['today_price']:
                     cursor.execute("UPDATE products SET today_price = ? WHERE id = ? AND user_email = ?", (new_price, row['id'], user_email))
-                    current_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    cursor.execute("INSERT INTO price_history VALUES (?, ?, ?, ?, ?)", 
-                                   (row['name'], row['today_price'], new_price, current_date, user_email))
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    cursor.execute("INSERT INTO price_history VALUES (?, ?, ?, ?, ?)", (row['name'], row['today_price'], new_price, current_time, user_email))
                     conn.commit()
-                    st.toast(f"✅ تم تحديث السعر وتعميمه!")
+                    st.toast(f"✅ تم تعميم سعر اليوم لـ {row['name']}!")
                     st.rerun()
 
-    # --- التبويب الثاني: الديون والحسابات ---
+    # --- التبويب الثاني: إدارة المخزن الأساسي وإضافة وحذف البضائع ---
     with tab2:
-        st.subheader("دفتر ديون العملاء والموردين الآجل")
-        
-        with st.expander("➕ إضافة اسم جديد للدفتر"):
-            name = st.text_input("اسم الشخص أو المحل")
-            acc_type = st.selectbox("نوع الحساب", ["عميل (مدين - عليه فلوس)", "مورد (دائن - يطلب فلوس)"])
-            balance = st.number_input("إجمالي الحساب الحالي (ج.م)", value=0.0)
-            if st.button("حفظ في الدفتر المشترك"):
-                if name:
-                    cursor.execute("INSERT INTO accounts (name, type, balance, user_email) VALUES (?, ?, ?, ?)", 
-                                   (name, acc_type, balance, user_email))
+        st.subheader("📦 إدارة أصل البضائع والمخزن")
+        with st.expander("➕ إضافة بضاعة/سلعة جديدة للمخزن الأصلي"):
+            p_name = st.text_input("اسم السلعة")
+            p_purchase = st.number_input("سعر التكلفة/الشراء (ج.م)", value=0.0)
+            p_today = st.number_input("سعر البيع الابتدائي (ج.م)", value=0.0)
+            p_stock = st.number_input("الكمية المتاحة", value=0, step=1)
+            if st.button("حفظ السلعة بالمخزن الأصلي"):
+                if p_name:
+                    cursor.execute("INSERT INTO products (name, purchase_price, today_price, stock, user_email) VALUES (?, ?, ?, ?, ?)", (p_name, p_purchase, p_today, p_stock, user_email))
                     conn.commit()
-                    st.success(f"تم تسجيل {name} وتحديث الدفتر المشترك!")
+                    st.success(f"تم تسجيل {p_name} بالمخزن!")
                     st.rerun()
-
-        st.markdown("### 📋 كشف الحسابات المشترك حالياً")
-        accounts_df = pd.read_sql_query("SELECT name as 'الاسم', type as 'النوع', balance as 'الحساب (ج.م)' FROM accounts WHERE user_email = ?", conn, params=(user_email,))
-        st.dataframe(accounts_df, use_container_width=True)
-
-    # --- 3. التبويب الثالث: مرجعيات وأرشيف الأسعار باليوم ---
-    with tab3:
-        st.subheader("📅 مرجعيات حركة الأسعار اليومية")
-        
-        history_dates_df = pd.read_sql_query("SELECT DISTINCT SUBSTR(date, 1, 10) as short_date FROM price_history WHERE user_email = ? ORDER BY date DESC", conn, params=(user_email,))
-        
-        if not history_dates_df.empty:
-            search_date = st.selectbox("اختر تاريخ اليوم المراد مراجعته", history_dates_df['short_date'].tolist())
-            st.markdown(f"📊 **جدول مرجعيات الأسعار ليوم: {search_date}**")
-            day_history_df = pd.read_sql_query(
-                "SELECT product_name as 'السلعة', old_price as 'السعر القديم', new_price as 'السعر الجديد', date as 'الوقت الفعلي للتحديث' FROM price_history WHERE user_email = ? AND date LIKE ?", 
-                conn, params=(user_email, f"{search_date}%")
-            )
-            st.dataframe(day_history_df, use_container_width=True)
+                    
+        st.markdown("### 📋 جرد حالة بضائع المخزن الحالي")
+        prod_df = pd.read_sql_query("SELECT id, name as 'السلعة', purchase_price as 'سعر الشراء', stock as 'الكمية المتاحة' FROM products WHERE user_email = ?", conn, params=(user_email,))
+        if not prod_df.empty:
+            for idx, r in prod_df.iterrows():
+                col_n, col_d = st.columns([3, 1])
+                with col_n:
+                    st.write(f"🔹 **{r['السلعة']}** - شراء: {r['سعر الشراء']} ج.م | مخزن: {r['الكمية المتاحة']}")
+                with col_d:
+                    if st.button("🗑️ حذف السلعة", key=f"del_prod_{r['id']}"):
+                        cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (r['id'], user_email))
+                        conn.commit()
+                        st.rerun()
         else:
-            st.info("💡 لا توجد مرجعيات مسجلة بعد. الأرشيف سيحفظ تلقائياً هنا بمجرد قيامك بتعديل أسعار السلع.")
+            st.info("المخزن فارغ تماماً.")
+
+    # --- التبويب الثالث: سجل الموردين لوحدهم وسجل العملاء لوحدهم ---
+    with tab3:
+        col_supp, col_cust = st.columns(2)
+        
+        with col_supp:
+            st.subheader("🏭 سجل الموردين (الدائنين)")
+            with st.expander("➕ إضافة مورد جديد"):
+                s_name = st.text_input("اسم المورد")
+                s_bal = st.number_input("حساب المورد الابتدائي (ج.م)", value=0.0)
+                if st.button("حفظ المورد"):
+                    if s_name:
+                        cursor.execute("INSERT INTO suppliers (name, balance, user_email) VALUES (?, ?, ?)", (s_name, s_bal, user_email))
+                        conn.commit()
+                        st.rerun()
+            supp_df = pd.read_sql_query("SELECT name as 'اسم المورد', balance as 'الحساب له (ج.م)' FROM suppliers WHERE user_email = ?", conn, params=(user_email,))
+            st.dataframe(supp_df, use_container_width=True)
+
+        with col_cust:
+            st.subheader("👥 سجل العملاء (المدينين)")
+            with st.expander("➕ إضافة عميل جديد"):
+                c_name = st.text_input("اسم العميل")
+                c_bal = st.number_input("حساب العميل المديونية الابتدائية (ج.م)", value=0.0)
+                if st.button("حفظ العميل"):
+                    if c_name:
+                        cursor.execute("INSERT INTO customers (name, balance, user_email) VALUES (?, ?, ?)", (c_name, c_bal, user_email))
+                        conn.commit()
+                        st.rerun()
+            cust_df = pd.read_sql_query("SELECT name as 'اسم العميل', balance as 'المديونية عليه (ج.م)' FROM customers WHERE user_email = ?", conn, params=(user_email,))
+            st.dataframe(cust_df, use_container_width=True)
+
+    # --- التبويب الرابع: تسجيل الفواتير البيع والشراء بالتأثير على الحسابات والمخزن ---
+    with tab4:
+        st.subheader("🧾 إنشاء وتسجيل فاتورة جديدة")
