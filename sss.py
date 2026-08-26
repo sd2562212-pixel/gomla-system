@@ -58,14 +58,14 @@ else:
             
     st.markdown("<hr style='margin-top:0; margin-bottom:15px;'>", unsafe_allow_html=True)
 
-    # التبويبات الرئيسية للنظام
+    # التبويبات الرئيسية للنظام (تم تصحيح السطر هنا)
     tab1, tab2, tab3 = st.tabs(["📊 أسعار اليوم والمخزن", "👥 الديون والحسابات", "📅 مرجعيات وأرشيف الأسعار"])
 
     # --- التبويب الأول: تحديث الأسعار والسلع اليومية ---
     with tab1:
         st.subheader("إدارة مخزن وبضاعة المحل")
         
-        # ميزة إضافة سلع جديدة من الموبايل مباشرة (بدلاً من الإضافة التلقائية)
+        # ميزة إضافة سلع جديدة من الموبايل مباشرة
         with st.expander("➕ إضافة بضاعة/سلعة جديدة للمخزن"):
             new_p_name = st.text_input("اسم السلعة (مثال: طن أرز الفيروز)")
             new_p_purchase = st.number_input("سعر الشراء الحالي (ج.م)", value=0.0)
@@ -93,11 +93,10 @@ else:
                 st.markdown(f"📦 **{row['name']}**")
                 c1, c2, c3 = st.columns([2, 2, 1])
                 with c1:
-                    st.write(f"(الشراء: {row['purchase_price']} ج.م | المخزن: {row['stock']})")
+                    st.write(f"(الشراء: {row['purchase_price']} | المخزن: {row['stock']})")
                 with c2:
-                    new_price = st.number_input(f"سعر اليوم (البيع)", value=float(row['today_price']), key=f"p_{row['id']}")
+                    new_price = st.number_input(f"سعر اليوم", value=float(row['today_price']), key=f"p_{row['id']}")
                 with c3:
-                    # ميزة حذف السلعة تماماً إذا أردت
                     if st.button("🗑️ حذف", key=f"del_{row['id']}"):
                         cursor.execute("DELETE FROM products WHERE id = ? AND user_email = ?", (row['id'], user_email))
                         conn.commit()
